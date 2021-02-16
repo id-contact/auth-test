@@ -110,7 +110,7 @@ async fn user_oob(config: State<'_, config::Config>, attributes: String, continu
     let result = client
         .post(attr_url)
         .json(&idauth::AuthResult {
-            status: idauth::AuthStatus::Succes(),
+            status: idauth::AuthStatus::Succes,
             attributes: Some(attributes.clone()),
             session_url,
         })
