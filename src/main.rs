@@ -1,11 +1,11 @@
 use rocket::{get, launch, post, response::Redirect, routes, State, request::Form, request::FromForm};
 use rocket_contrib::json::Json;
+use id_contact_jwe::sign_and_encrypt_attributes;
 use serde::Deserialize;
 use std::{error::Error as StdError, fmt::Display, fs::File};
 
 mod config;
 mod idauth;
-mod jwe;
 
 #[derive(Debug)]
 enum Error {
@@ -13,7 +13,7 @@ enum Error {
     Decode(base64::DecodeError),
     Json(serde_json::Error),
     Utf(std::str::Utf8Error),
-    JWT(jwe::Error),
+    JWT(id_contact_jwe::Error),
 }
 
 impl<'r, 'o: 'r> rocket::response::Responder<'r, 'o> for Error {
@@ -47,8 +47,8 @@ impl From<std::str::Utf8Error> for Error {
     }
 }
 
-impl From<jwe::Error> for Error {
-    fn from(e: jwe::Error) -> Error {
+impl From<id_contact_jwe::Error> for Error {
+    fn from(e: id_contact_jwe::Error) -> Error {
         Error::JWT(e)
     }
 }
@@ -93,7 +93,7 @@ async fn user_oob(config: State<'_, config::Config>, attributes: String, continu
     let attributes = base64::decode(attributes)?;
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
-    let attributes = jwe::sign_and_encrypt_attributes(&attributes, config.signer(), config.encrypter())?;
+    let attributes = sign_and_encrypt_attributes(&attributes, config.signer(), config.encrypter())?;
 
     let continuation = base64::decode(continuation)?;
     let continuation = std::str::from_utf8(&continuation)?;
@@ -132,7 +132,7 @@ async fn user_inline(config: State<'_, config::Config>, attributes: String, cont
     let attributes = base64::decode(attributes)?;
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
-    let attributes = jwe::sign_and_encrypt_attributes(&attributes, config.signer(), config.encrypter())?;
+    let attributes = sign_and_encrypt_attributes(&attributes, config.signer(), config.encrypter())?;
 
     let continuation = base64::decode(continuation)?;
     let continuation = std::str::from_utf8(&continuation)?;

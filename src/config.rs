@@ -1,9 +1,9 @@
 use std::{collections::HashMap, convert::TryFrom, error::Error as StdError, fmt::Display};
 use serde::Deserialize;
-
+use id_contact_jwe::{SignKeyConfig, EncryptionKeyConfig};
 use josekit::{
-    jwe::{JweEncrypter, ECDH_ES, RSA_OAEP},
-    jws::{JwsSigner, ES256, RS256},
+    jwe::{JweEncrypter},
+    jws::{JwsSigner},
 };
 
 #[derive(Debug)]
@@ -11,7 +11,7 @@ pub enum Error {
     UnknownAttribute(String),
     YamlError(serde_yaml::Error),
     Json(serde_json::Error),
-    JWT(josekit::JoseError),
+    JWT(id_contact_jwe::Error),
 }
 
 impl From<serde_yaml::Error> for Error {
@@ -26,8 +26,8 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<josekit::JoseError> for Error {
-    fn from(e: josekit::JoseError) -> Error {
+impl From<id_contact_jwe::Error> for Error {
+    fn from(e: id_contact_jwe::Error) -> Error {
         Error::JWT(e)
     }
 }
@@ -55,43 +55,6 @@ impl StdError for Error {
 }
 
 #[derive(Deserialize, Debug)]
-struct InnerKeyConfig {
-    key: String,
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-enum EncryptionKeyConfig {
-    RSA(InnerKeyConfig),
-    EC(InnerKeyConfig),
-}
-
-impl EncryptionKeyConfig {
-    fn to_encrypter(&self) -> Result<Box<dyn JweEncrypter>, Error> {
-        match self {
-            EncryptionKeyConfig::RSA(key) => Ok(Box::new(RSA_OAEP.encrypter_from_pem(&key.key)?)),
-            EncryptionKeyConfig::EC(key) => Ok(Box::new(ECDH_ES.encrypter_from_pem(&key.key)?)),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "type")]
-enum SignKeyConfig {
-    RSA(InnerKeyConfig),
-    EC(InnerKeyConfig),
-}
-
-impl SignKeyConfig {
-    fn to_signer(&self) -> Result<Box<dyn JwsSigner>, Error> {
-        match self {
-            SignKeyConfig::RSA(key) => Ok(Box::new(RS256.signer_from_pem(&key.key)?)),
-            SignKeyConfig::EC(key) => Ok(Box::new(ES256.signer_from_pem(&key.key)?)),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
 struct RawConfig {
     server_url: String,
     attributes: HashMap<String, String>,
@@ -110,6 +73,7 @@ pub struct Config {
     signer: Box<dyn JwsSigner>,
 }
 
+// This tryfrom can be removed once try_from for fields lands in serde
 impl TryFrom<RawConfig> for Config {
     type Error = Error;
     fn try_from(config: RawConfig) -> Result<Config, Error> {
@@ -117,8 +81,8 @@ impl TryFrom<RawConfig> for Config {
             server_url: config.server_url,
             attributes: config.attributes,
             with_session: config.with_session,
-            encrypter: config.encryption_pubkey.to_encrypter()?,
-            signer: config.signing_privkey.to_signer()?,
+            encrypter: Box::<dyn JweEncrypter>::try_from(config.encryption_pubkey)?,
+            signer: Box::<dyn JwsSigner>::try_from(config.signing_privkey)?,
         })
     }
 }
