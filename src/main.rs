@@ -3,9 +3,9 @@ use rocket_contrib::json::Json;
 use id_contact_jwe::sign_and_encrypt_attributes;
 use serde::Deserialize;
 use std::{error::Error as StdError, fmt::Display, fs::File};
+use id_contact_proto::{SessionActivity, AuthResult, AuthStatus, StartAuthRequest, StartAuthResponse};
 
 mod config;
-mod idauth;
 
 #[derive(Debug)]
 enum Error {
@@ -80,12 +80,12 @@ impl StdError for Error {
 #[derive(FromForm, Debug)]
 struct SessionUpdateData {
     #[form(field="type")]
-    typeval: String
+    typeval: SessionActivity
 }
 
 #[post("/session/update?<typedata..>")]
 async fn session_update(typedata: Form<SessionUpdateData>) {
-    println!("Session update received: {}", typedata.typeval);
+    println!("Session update received: {:?}", typedata.typeval);
 }
 
 #[get("/browser/<attributes>/<continuation>/<attr_url>")]
@@ -109,8 +109,8 @@ async fn user_oob(config: State<'_, config::Config>, attributes: String, continu
     let client = reqwest::Client::new();
     let result = client
         .post(attr_url)
-        .json(&idauth::AuthResult {
-            status: idauth::AuthStatus::Succes,
+        .json(&AuthResult {
+            status: AuthStatus::Succes,
             attributes: Some(attributes.clone()),
             session_url,
         })
@@ -150,8 +150,8 @@ async fn user_inline(config: State<'_, config::Config>, attributes: String, cont
 #[post("/start_authentication", data = "<request>")]
 async fn start_authentication(
     config: State<'_, config::Config>,
-    request: Json<idauth::AuthRequest>,
-) -> Result<Json<idauth::StartAuthResponse>, Error> {
+    request: Json<StartAuthRequest>,
+) -> Result<Json<StartAuthResponse>, Error> {
     config.verify_attributes(&request.attributes)?;
 
     let attributes = base64::encode(serde_json::to_vec(&request.attributes)?);
@@ -160,7 +160,7 @@ async fn start_authentication(
     if let Some(attr_url) = &request.attr_url {
         let attr_url = base64::encode(attr_url);
 
-        Ok(Json(idauth::StartAuthResponse {
+        Ok(Json(StartAuthResponse {
             client_url: format!("{}/browser/{}/{}/{}",
                 config.server_url(),
                 attributes,
@@ -169,7 +169,7 @@ async fn start_authentication(
             ),
         }))
     } else {
-        Ok(Json(idauth::StartAuthResponse {
+        Ok(Json(StartAuthResponse {
             client_url: format!("{}/browser/{}/{}",
                 config.server_url(),
                 attributes,
