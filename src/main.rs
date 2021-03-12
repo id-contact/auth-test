@@ -1,9 +1,10 @@
-use rocket::{get, launch, post, response::Redirect, routes, State, request::Form, request::FromForm};
+use id_contact_jwt::sign_and_encrypt_auth_result;
+use id_contact_proto::{
+    AuthResult, AuthStatus, SessionActivity, StartAuthRequest, StartAuthResponse,
+};
+use rocket::{form::FromForm, get, launch, post, response::Redirect, routes, State};
 use rocket_contrib::json::Json;
-use id_contact_jwe::sign_and_encrypt_attributes;
-use serde::Deserialize;
 use std::{error::Error as StdError, fmt::Display, fs::File};
-use id_contact_proto::{SessionActivity, AuthResult, AuthStatus, StartAuthRequest, StartAuthResponse};
 
 mod config;
 
@@ -13,7 +14,7 @@ enum Error {
     Decode(base64::DecodeError),
     Json(serde_json::Error),
     Utf(std::str::Utf8Error),
-    JWT(id_contact_jwe::Error),
+    JWT(id_contact_jwt::Error),
 }
 
 impl<'r, 'o: 'r> rocket::response::Responder<'r, 'o> for Error {
@@ -47,8 +48,8 @@ impl From<std::str::Utf8Error> for Error {
     }
 }
 
-impl From<id_contact_jwe::Error> for Error {
-    fn from(e: id_contact_jwe::Error) -> Error {
+impl From<id_contact_jwt::Error> for Error {
+    fn from(e: id_contact_jwt::Error) -> Error {
         Error::JWT(e)
     }
 }
@@ -79,21 +80,36 @@ impl StdError for Error {
 
 #[derive(FromForm, Debug)]
 struct SessionUpdateData {
-    #[form(field="type")]
-    typeval: SessionActivity
+    #[field(name = "type")]
+    typeval: SessionActivity,
 }
 
 #[post("/session/update?<typedata..>")]
-async fn session_update(typedata: Form<SessionUpdateData>) {
+async fn session_update(typedata: SessionUpdateData) {
     println!("Session update received: {:?}", typedata.typeval);
 }
 
 #[get("/browser/<attributes>/<continuation>/<attr_url>")]
-async fn user_oob(config: State<'_, config::Config>, attributes: String, continuation: String, attr_url: String) -> Result<Redirect, Error> {
+async fn user_oob(
+    config: State<'_, config::Config>,
+    attributes: String,
+    continuation: String,
+    attr_url: String,
+) -> Result<Redirect, Error> {
     let attributes = base64::decode(attributes)?;
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
-    let attributes = sign_and_encrypt_attributes(&attributes, config.signer(), config.encrypter())?;
+    let auth_result = AuthResult {
+        status: AuthStatus::Succes,
+        attributes: Some(attributes),
+        session_url: if config.with_session() {
+            Some(format!("{}/session/update", config.server_url()))
+        } else {
+            None
+        },
+    };
+    let auth_result =
+        sign_and_encrypt_auth_result(&auth_result, config.signer(), config.encrypter())?;
 
     let continuation = base64::decode(continuation)?;
     let continuation = std::str::from_utf8(&continuation)?;
@@ -101,26 +117,18 @@ async fn user_oob(config: State<'_, config::Config>, attributes: String, continu
     let attr_url = base64::decode(attr_url)?;
     let attr_url = std::str::from_utf8(&attr_url)?;
 
-    let mut session_url = None;
-    if config.with_session() {
-        session_url = Some(format!("{}/session/update", config.server_url()));
-    }
-
     let client = reqwest::Client::new();
     let result = client
         .post(attr_url)
-        .json(&AuthResult {
-            status: AuthStatus::Succes,
-            attributes: Some(attributes.clone()),
-            session_url,
-        })
+        .header("Content-Type", "application/jwt")
+        .body(auth_result.clone())
         .send()
         .await;
     if let Err(e) = result {
         // Log only
         println!("Failure reporting results: {}", e);
     } else {
-        println!("Reported result jwe {} to {}", &attributes, attr_url);
+        println!("Reported result jwe {} to {}", &auth_result, attr_url);
     }
 
     println!("Redirecting user to {}", continuation);
@@ -128,22 +136,43 @@ async fn user_oob(config: State<'_, config::Config>, attributes: String, continu
 }
 
 #[get("/browser/<attributes>/<continuation>")]
-async fn user_inline(config: State<'_, config::Config>, attributes: String, continuation: String) -> Result<Redirect, Error> {
+async fn user_inline(
+    config: State<'_, config::Config>,
+    attributes: String,
+    continuation: String,
+) -> Result<Redirect, Error> {
     let attributes = base64::decode(attributes)?;
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
-    let attributes = sign_and_encrypt_attributes(&attributes, config.signer(), config.encrypter())?;
+    let auth_result = AuthResult {
+        status: AuthStatus::Succes,
+        attributes: Some(attributes),
+        session_url: if config.with_session() {
+            Some(format!("{}/session/update", config.server_url()))
+        } else {
+            None
+        },
+    };
+    let auth_result =
+        sign_and_encrypt_auth_result(&auth_result, config.signer(), config.encrypter())?;
 
     let continuation = base64::decode(continuation)?;
     let continuation = std::str::from_utf8(&continuation)?;
 
-    println!("Redirecting user to {} with attribute result {}", continuation, &attributes);
-
-    if config.with_session() {
-        let session_url = urlencoding::encode(&format!("{}/session/update", config.server_url()));
-        Ok(Redirect::to(format!("{}?status=succes&attributes={}&session_url={}", continuation, attributes, session_url)))
+    println!(
+        "Redirecting user to {} with auth result {}",
+        continuation, &auth_result
+    );
+    if continuation.contains('?') {
+        Ok(Redirect::to(format!(
+            "{}&result={}",
+            continuation, auth_result
+        )))
     } else {
-        Ok(Redirect::to(format!("{}?status=succes&attributes={}", continuation, attributes)))
+        Ok(Redirect::to(format!(
+            "{}?result={}",
+            continuation, auth_result
+        )))
     }
 }
 
@@ -161,7 +190,8 @@ async fn start_authentication(
         let attr_url = base64::encode(attr_url);
 
         Ok(Json(StartAuthResponse {
-            client_url: format!("{}/browser/{}/{}/{}",
+            client_url: format!(
+                "{}/browser/{}/{}/{}",
                 config.server_url(),
                 attributes,
                 continuation,
@@ -170,7 +200,8 @@ async fn start_authentication(
         }))
     } else {
         Ok(Json(StartAuthResponse {
-            client_url: format!("{}/browser/{}/{}",
+            client_url: format!(
+                "{}/browser/{}/{}",
                 config.server_url(),
                 attributes,
                 continuation,
@@ -186,12 +217,7 @@ fn rocket() -> rocket::Rocket {
     rocket::ignite()
         .mount(
             "/",
-            routes![
-                start_authentication,
-                user_inline,
-                user_oob,
-                session_update,
-            ],
+            routes![start_authentication, user_inline, user_oob, session_update,],
         )
         .manage(config::Config::from_reader(&configfile).expect("Could not read configuration"))
 }
