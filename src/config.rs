@@ -1,17 +1,14 @@
-use std::{collections::HashMap, convert::TryFrom, error::Error as StdError, fmt::Display};
+use id_contact_jwt::{EncryptionKeyConfig, SignKeyConfig};
+use josekit::{jwe::JweEncrypter, jws::JwsSigner};
 use serde::Deserialize;
-use id_contact_jwe::{SignKeyConfig, EncryptionKeyConfig};
-use josekit::{
-    jwe::{JweEncrypter},
-    jws::{JwsSigner},
-};
+use std::{collections::HashMap, convert::TryFrom, error::Error as StdError, fmt::Display};
 
 #[derive(Debug)]
 pub enum Error {
     UnknownAttribute(String),
     YamlError(serde_yaml::Error),
     Json(serde_json::Error),
-    JWT(id_contact_jwe::Error),
+    JWT(id_contact_jwt::Error),
 }
 
 impl From<serde_yaml::Error> for Error {
@@ -26,8 +23,8 @@ impl From<serde_json::Error> for Error {
     }
 }
 
-impl From<id_contact_jwe::Error> for Error {
-    fn from(e: id_contact_jwe::Error) -> Error {
+impl From<id_contact_jwt::Error> for Error {
+    fn from(e: id_contact_jwt::Error) -> Error {
         Error::JWT(e)
     }
 }
@@ -88,9 +85,11 @@ impl TryFrom<RawConfig> for Config {
 }
 
 impl Config {
-    pub fn verify_attributes(&self, attributes:&[String]) -> Result<(), Error> {
+    pub fn verify_attributes(&self, attributes: &[String]) -> Result<(), Error> {
         for attribute in attributes.iter() {
-            self.attributes.get(attribute).ok_or_else(|| Error::UnknownAttribute(attribute.clone()))?;
+            self.attributes
+                .get(attribute)
+                .ok_or_else(|| Error::UnknownAttribute(attribute.clone()))?;
         }
 
         Ok(())
@@ -99,7 +98,13 @@ impl Config {
     pub fn map_attributes(&self, attributes: &[String]) -> Result<HashMap<String, String>, Error> {
         let mut result: HashMap<String, String> = HashMap::new();
         for attribute in attributes.iter() {
-            result.insert(attribute.clone(), self.attributes.get(attribute).ok_or_else(|| Error::UnknownAttribute(attribute.clone()))?.clone());
+            result.insert(
+                attribute.clone(),
+                self.attributes
+                    .get(attribute)
+                    .ok_or_else(|| Error::UnknownAttribute(attribute.clone()))?
+                    .clone(),
+            );
         }
 
         Ok(result)
