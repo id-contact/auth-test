@@ -1,3 +1,4 @@
+use base64::URL_SAFE;
 use id_contact_jwt::sign_and_encrypt_auth_result;
 use id_contact_proto::{
     AuthResult, AuthStatus, SessionActivity, StartAuthRequest, StartAuthResponse,
@@ -96,7 +97,7 @@ async fn user_oob(
     continuation: String,
     attr_url: String,
 ) -> Result<Redirect, Error> {
-    let attributes = base64::decode(attributes)?;
+    let attributes = base64::decode_config(attributes, URL_SAFE)?;
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
     let auth_result = AuthResult {
@@ -111,10 +112,10 @@ async fn user_oob(
     let auth_result =
         sign_and_encrypt_auth_result(&auth_result, config.signer(), config.encrypter())?;
 
-    let continuation = base64::decode(continuation)?;
+    let continuation = base64::decode_config(continuation, URL_SAFE)?;
     let continuation = std::str::from_utf8(&continuation)?;
 
-    let attr_url = base64::decode(attr_url)?;
+    let attr_url = base64::decode_config(attr_url, URL_SAFE)?;
     let attr_url = std::str::from_utf8(&attr_url)?;
 
     let client = reqwest::Client::new();
@@ -141,7 +142,7 @@ async fn user_inline(
     attributes: String,
     continuation: String,
 ) -> Result<Redirect, Error> {
-    let attributes = base64::decode(attributes)?;
+    let attributes = base64::decode_config(attributes, URL_SAFE)?;
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
     let auth_result = AuthResult {
@@ -156,7 +157,7 @@ async fn user_inline(
     let auth_result =
         sign_and_encrypt_auth_result(&auth_result, config.signer(), config.encrypter())?;
 
-    let continuation = base64::decode(continuation)?;
+    let continuation = base64::decode_config(continuation, URL_SAFE)?;
     let continuation = std::str::from_utf8(&continuation)?;
 
     println!(
@@ -183,11 +184,11 @@ async fn start_authentication(
 ) -> Result<Json<StartAuthResponse>, Error> {
     config.verify_attributes(&request.attributes)?;
 
-    let attributes = base64::encode(serde_json::to_vec(&request.attributes)?);
-    let continuation = base64::encode(&request.continuation);
+    let attributes = base64::encode_config(serde_json::to_vec(&request.attributes)?, URL_SAFE);
+    let continuation = base64::encode_config(&request.continuation, URL_SAFE);
 
     if let Some(attr_url) = &request.attr_url {
-        let attr_url = base64::encode(attr_url);
+        let attr_url = base64::encode_config(attr_url, URL_SAFE);
 
         Ok(Json(StartAuthResponse {
             client_url: format!(
