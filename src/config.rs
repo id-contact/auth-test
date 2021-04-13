@@ -51,10 +51,15 @@ impl StdError for Error {
     }
 }
 
+fn default_as_false() -> bool {
+    false
+}
+
 #[derive(Deserialize, Debug)]
 struct RawConfig {
     server_url: String,
     attributes: HashMap<String, String>,
+    #[serde(default = "default_as_false")]
     with_session: bool,
     encryption_pubkey: EncryptionKeyConfig,
     signing_privkey: SignKeyConfig,
