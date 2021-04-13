@@ -55,6 +55,7 @@ impl StdError for Error {
 struct RawConfig {
     server_url: String,
     attributes: HashMap<String, String>,
+    #[serde(default = "bool::default")]
     with_session: bool,
     encryption_pubkey: EncryptionKeyConfig,
     signing_privkey: SignKeyConfig,
