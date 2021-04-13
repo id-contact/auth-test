@@ -1,11 +1,12 @@
 use base64::URL_SAFE;
+use config::Config;
 use id_contact_jwt::sign_and_encrypt_auth_result;
 use id_contact_proto::{
     AuthResult, AuthStatus, SessionActivity, StartAuthRequest, StartAuthResponse,
 };
-use rocket::{form::FromForm, get, launch, post, response::Redirect, routes, State};
+use rocket::{form::FromForm, fairing::AdHoc, get, launch, post, response::Redirect, routes, State};
 use rocket_contrib::json::Json;
-use std::{error::Error as StdError, fmt::Display, fs::File};
+use std::{error::Error as StdError, fmt::Display};
 
 mod config;
 
@@ -213,12 +214,10 @@ async fn start_authentication(
 
 #[launch]
 fn rocket() -> rocket::Rocket {
-    let configfile = File::open(std::env::var("CONFIG").expect("No configuration file specified"))
-        .expect("Could not open configuration");
     rocket::ignite()
         .mount(
             "/",
             routes![start_authentication, user_inline, user_oob, session_update,],
         )
-        .manage(config::Config::from_reader(&configfile).expect("Could not read configuration"))
+        .attach(AdHoc::config::<Config>())
 }

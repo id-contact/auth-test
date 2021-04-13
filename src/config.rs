@@ -125,12 +125,4 @@ impl Config {
     pub fn signer(&self) -> &dyn JwsSigner {
         self.signer.as_ref()
     }
-
-    pub fn from_string(config: &str) -> Result<Config, Error> {
-        Ok(serde_yaml::from_str(config)?)
-    }
-
-    pub fn from_reader<T: std::io::Read>(reader: T) -> Result<Config, Error> {
-        Ok(serde_yaml::from_reader(reader)?)
-    }
 }
