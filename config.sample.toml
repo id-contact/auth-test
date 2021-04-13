@@ -3,7 +3,7 @@ server_url = "https://auth-test.idcontact.test.tweede.golf"
 with_session = true
 
 [global.attributes]
-email = "bla"
+email = "bla@example.com"
 
 [global.encryption_pubkey]
 type = "RSA"
