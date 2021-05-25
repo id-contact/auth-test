@@ -1,10 +1,11 @@
+use askama::Template;
 use base64::URL_SAFE;
 use config::Config;
 use id_contact_jwt::sign_and_encrypt_auth_result;
 use id_contact_proto::{
     AuthResult, AuthStatus, SessionActivity, StartAuthRequest, StartAuthResponse,
 };
-use rocket::{form::FromForm, fairing::AdHoc, get, launch, post, response::Redirect, routes, State};
+use rocket::{State, fairing::AdHoc, form::FromForm, get, launch, post, response::{Redirect, content::Html}, routes};
 use rocket_contrib::json::Json;
 use std::{error::Error as StdError, fmt::Display};
 
@@ -14,6 +15,7 @@ mod config;
 enum Error {
     Config(config::Error),
     Decode(base64::DecodeError),
+    Template(askama::Error),
     Json(serde_json::Error),
     Utf(std::str::Utf8Error),
     JWT(id_contact_jwt::Error),
@@ -35,6 +37,12 @@ impl From<config::Error> for Error {
 impl From<base64::DecodeError> for Error {
     fn from(e: base64::DecodeError) -> Error {
         Error::Decode(e)
+    }
+}
+
+impl From<askama::Error> for Error {
+    fn from(e: askama::Error) -> Error {
+        Error::Template(e)
     }
 }
 
@@ -61,6 +69,7 @@ impl Display for Error {
         match self {
             Error::Config(e) => e.fmt(f),
             Error::Decode(e) => e.fmt(f),
+            Error::Template(e) => e.fmt(f),
             Error::Utf(e) => e.fmt(f),
             Error::Json(e) => e.fmt(f),
             Error::JWT(e) => e.fmt(f),
@@ -73,6 +82,7 @@ impl StdError for Error {
         match self {
             Error::Config(e) => Some(e),
             Error::Decode(e) => Some(e),
+            Error::Template(e) => Some(e),
             Error::Utf(e) => Some(e),
             Error::Json(e) => Some(e),
             Error::JWT(e) => Some(e),
@@ -80,10 +90,43 @@ impl StdError for Error {
     }
 }
 
+#[derive(Template)]
+#[template(path="confirm_auth.html")]
+struct ConfirmTemplate<'a> {
+    dologin: &'a str
+}
+
 #[derive(FromForm, Debug)]
 struct SessionUpdateData {
     #[field(name = "type")]
     typeval: SessionActivity,
+}
+
+#[get("/confirm/<attributes>/<continuation>/<attr_url>")]
+async fn confirm_oob(
+  config: State<'_, config::Config>,
+  attributes: String,
+  continuation: String,
+  attr_url: String,
+) -> Result<Html<String>, Error> {
+    let template = ConfirmTemplate{
+        dologin: &format!("{}/browser/{}/{}/{}", config.server_url(), attributes, continuation, attr_url),
+    };
+    let output = template.render()?;
+    Ok(Html(output))
+}
+
+#[get("/confirm/<attributes>/<continuation>")]
+async fn confirm_ib(
+  config: State<'_, config::Config>,
+  attributes: String,
+  continuation: String,
+) -> Result<Html<String>, Error> {
+    let template = ConfirmTemplate{
+        dologin: &format!("{}/browser/{}/{}", config.server_url(), attributes, continuation),
+    };
+    let output = template.render()?;
+    Ok(Html(output))
 }
 
 #[post("/session/update?<typedata..>")]
@@ -193,7 +236,7 @@ async fn start_authentication(
 
         Ok(Json(StartAuthResponse {
             client_url: format!(
-                "{}/browser/{}/{}/{}",
+                "{}/confirm/{}/{}/{}",
                 config.server_url(),
                 attributes,
                 continuation,
@@ -203,7 +246,7 @@ async fn start_authentication(
     } else {
         Ok(Json(StartAuthResponse {
             client_url: format!(
-                "{}/browser/{}/{}",
+                "{}/confirm/{}/{}",
                 config.server_url(),
                 attributes,
                 continuation,
@@ -217,7 +260,7 @@ fn rocket() -> rocket::Rocket {
     rocket::ignite()
         .mount(
             "/",
-            routes![start_authentication, user_inline, user_oob, session_update,],
+            routes![start_authentication, user_inline, user_oob, session_update, confirm_oob, confirm_ib],
         )
         .attach(AdHoc::config::<Config>())
 }
