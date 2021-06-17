@@ -4,6 +4,8 @@ with_session = true
 
 [global.attributes]
 email = "bla@example.com"
+fullname = "Robin de Graaf"
+city = "Demodam"
 
 [global.encryption_pubkey]
 type = "RSA"
