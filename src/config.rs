@@ -6,14 +6,14 @@ use std::{collections::HashMap, convert::TryFrom, error::Error as StdError, fmt:
 #[derive(Debug)]
 pub enum Error {
     UnknownAttribute(String),
-    YamlError(serde_yaml::Error),
+    Yaml(serde_yaml::Error),
     Json(serde_json::Error),
-    JWT(id_contact_jwt::Error),
+    Jwt(id_contact_jwt::Error),
 }
 
 impl From<serde_yaml::Error> for Error {
     fn from(e: serde_yaml::Error) -> Error {
-        Error::YamlError(e)
+        Error::Yaml(e)
     }
 }
 
@@ -25,7 +25,7 @@ impl From<serde_json::Error> for Error {
 
 impl From<id_contact_jwt::Error> for Error {
     fn from(e: id_contact_jwt::Error) -> Error {
-        Error::JWT(e)
+        Error::Jwt(e)
     }
 }
 
@@ -33,9 +33,9 @@ impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Error::UnknownAttribute(a) => f.write_fmt(format_args!("Unknown attribute {}", a)),
-            Error::YamlError(e) => e.fmt(f),
+            Error::Yaml(e) => e.fmt(f),
             Error::Json(e) => e.fmt(f),
-            Error::JWT(e) => e.fmt(f),
+            Error::Jwt(e) => e.fmt(f),
         }
     }
 }
@@ -43,9 +43,9 @@ impl Display for Error {
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
-            Error::YamlError(e) => Some(e),
+            Error::Yaml(e) => Some(e),
             Error::Json(e) => Some(e),
-            Error::JWT(e) => Some(e),
+            Error::Jwt(e) => Some(e),
             _ => None,
         }
     }
