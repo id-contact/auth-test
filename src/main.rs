@@ -25,7 +25,7 @@ enum Error {
     Template(askama::Error),
     Json(serde_json::Error),
     Utf(std::str::Utf8Error),
-    JWT(id_contact_jwt::Error),
+    Jwt(id_contact_jwt::Error),
 }
 
 impl<'r, 'o: 'r> rocket::response::Responder<'r, 'o> for Error {
@@ -67,7 +67,7 @@ impl From<std::str::Utf8Error> for Error {
 
 impl From<id_contact_jwt::Error> for Error {
     fn from(e: id_contact_jwt::Error) -> Error {
-        Error::JWT(e)
+        Error::Jwt(e)
     }
 }
 
@@ -79,7 +79,7 @@ impl Display for Error {
             Error::Template(e) => e.fmt(f),
             Error::Utf(e) => e.fmt(f),
             Error::Json(e) => e.fmt(f),
-            Error::JWT(e) => e.fmt(f),
+            Error::Jwt(e) => e.fmt(f),
         }
     }
 }
@@ -92,7 +92,7 @@ impl StdError for Error {
             Error::Template(e) => Some(e),
             Error::Utf(e) => Some(e),
             Error::Json(e) => Some(e),
-            Error::JWT(e) => Some(e),
+            Error::Jwt(e) => Some(e),
         }
     }
 }
