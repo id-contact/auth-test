@@ -5,8 +5,15 @@ use id_contact_jwt::sign_and_encrypt_auth_result;
 use id_contact_proto::{
     AuthResult, AuthStatus, SessionActivity, StartAuthRequest, StartAuthResponse,
 };
-use rocket::{State, fairing::AdHoc, form::FromForm, get, launch, post, response::{Redirect, content::Html}, routes};
-use rocket_contrib::json::Json;
+use rocket::{
+    fairing::AdHoc,
+    form::FromForm,
+    get, launch, post,
+    response::{content::Html, Redirect},
+    routes,
+    serde::json::Json,
+    State,
+};
 use std::{error::Error as StdError, fmt::Display};
 
 mod config;
@@ -91,9 +98,9 @@ impl StdError for Error {
 }
 
 #[derive(Template)]
-#[template(path="confirm_auth.html")]
+#[template(path = "confirm_auth.html")]
 struct ConfirmTemplate<'a> {
-    dologin: &'a str
+    dologin: &'a str,
 }
 
 #[derive(FromForm, Debug)]
@@ -104,13 +111,19 @@ struct SessionUpdateData {
 
 #[get("/confirm/<attributes>/<continuation>/<attr_url>")]
 async fn confirm_oob(
-  config: State<'_, config::Config>,
-  attributes: String,
-  continuation: String,
-  attr_url: String,
+    config: &State<config::Config>,
+    attributes: String,
+    continuation: String,
+    attr_url: String,
 ) -> Result<Html<String>, Error> {
-    let template = ConfirmTemplate{
-        dologin: &format!("{}/browser/{}/{}/{}", config.server_url(), attributes, continuation, attr_url),
+    let template = ConfirmTemplate {
+        dologin: &format!(
+            "{}/browser/{}/{}/{}",
+            config.server_url(),
+            attributes,
+            continuation,
+            attr_url
+        ),
     };
     let output = template.render()?;
     Ok(Html(output))
@@ -118,12 +131,17 @@ async fn confirm_oob(
 
 #[get("/confirm/<attributes>/<continuation>")]
 async fn confirm_ib(
-  config: State<'_, config::Config>,
-  attributes: String,
-  continuation: String,
+    config: &State<config::Config>,
+    attributes: String,
+    continuation: String,
 ) -> Result<Html<String>, Error> {
-    let template = ConfirmTemplate{
-        dologin: &format!("{}/browser/{}/{}", config.server_url(), attributes, continuation),
+    let template = ConfirmTemplate {
+        dologin: &format!(
+            "{}/browser/{}/{}",
+            config.server_url(),
+            attributes,
+            continuation
+        ),
     };
     let output = template.render()?;
     Ok(Html(output))
@@ -136,7 +154,7 @@ async fn session_update(typedata: SessionUpdateData) {
 
 #[get("/browser/<attributes>/<continuation>/<attr_url>")]
 async fn user_oob(
-    config: State<'_, config::Config>,
+    config: &State<config::Config>,
     attributes: String,
     continuation: String,
     attr_url: String,
@@ -182,7 +200,7 @@ async fn user_oob(
 
 #[get("/browser/<attributes>/<continuation>")]
 async fn user_inline(
-    config: State<'_, config::Config>,
+    config: &State<config::Config>,
     attributes: String,
     continuation: String,
 ) -> Result<Redirect, Error> {
@@ -223,7 +241,7 @@ async fn user_inline(
 
 #[post("/start_authentication", data = "<request>")]
 async fn start_authentication(
-    config: State<'_, config::Config>,
+    config: &State<config::Config>,
     request: Json<StartAuthRequest>,
 ) -> Result<Json<StartAuthResponse>, Error> {
     config.verify_attributes(&request.attributes)?;
@@ -256,11 +274,18 @@ async fn start_authentication(
 }
 
 #[launch]
-fn rocket() -> rocket::Rocket {
-    rocket::ignite()
+fn rocket() -> _ {
+    rocket::build()
         .mount(
             "/",
-            routes![start_authentication, user_inline, user_oob, session_update, confirm_oob, confirm_ib],
+            routes![
+                start_authentication,
+                user_inline,
+                user_oob,
+                session_update,
+                confirm_oob,
+                confirm_ib
+            ],
         )
         .attach(AdHoc::config::<Config>())
 }
