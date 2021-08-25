@@ -6,7 +6,6 @@ use id_contact_proto::{
     AuthResult, AuthStatus, SessionActivity, StartAuthRequest, StartAuthResponse,
 };
 use rocket::{
-    fairing::AdHoc,
     form::FromForm,
     get, launch, post,
     response::{content::Html, Redirect},
@@ -275,17 +274,22 @@ async fn start_authentication(
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build()
-        .mount(
-            "/",
-            routes![
-                start_authentication,
-                user_inline,
-                user_oob,
-                session_update,
-                confirm_oob,
-                confirm_ib
-            ],
-        )
-        .attach(AdHoc::config::<Config>())
+    let base = rocket::build().mount(
+        "/",
+        routes![
+            start_authentication,
+            user_inline,
+            user_oob,
+            session_update,
+            confirm_oob,
+            confirm_ib
+        ],
+    );
+
+    let config = base.figment().extract::<Config>().unwrap_or_else(|_e| {
+        // Drop error value, as it could contain secrets
+        panic!("Failure to parse configuration")
+    });
+
+    base.manage(config)
 }
