@@ -165,7 +165,7 @@ async fn user_oob(
         status: AuthStatus::Succes,
         attributes: Some(attributes),
         session_url: if config.with_session() {
-            Some(format!("{}/session/update", config.server_url()))
+            Some(format!("{}/session/update", config.internal_url()))
         } else {
             None
         },
@@ -210,7 +210,7 @@ async fn user_inline(
         status: AuthStatus::Succes,
         attributes: Some(attributes),
         session_url: if config.with_session() {
-            Some(format!("{}/session/update", config.server_url()))
+            Some(format!("{}/session/update", config.internal_url()))
         } else {
             None
         },
