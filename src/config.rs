@@ -54,6 +54,7 @@ impl StdError for Error {
 #[derive(Deserialize, Debug)]
 struct RawConfig {
     server_url: String,
+    internal_url: String,
     attributes: HashMap<String, String>,
     #[serde(default = "bool::default")]
     with_session: bool,
@@ -65,6 +66,7 @@ struct RawConfig {
 #[serde(try_from = "RawConfig")]
 pub struct Config {
     server_url: String,
+    internal_url: String,
     attributes: HashMap<String, String>,
     with_session: bool,
     encrypter: Box<dyn JweEncrypter>,
@@ -77,6 +79,7 @@ impl TryFrom<RawConfig> for Config {
     fn try_from(config: RawConfig) -> Result<Config, Error> {
         Ok(Config {
             server_url: config.server_url,
+            internal_url: config.internal_url,
             attributes: config.attributes,
             with_session: config.with_session,
             encrypter: Box::<dyn JweEncrypter>::try_from(config.encryption_pubkey)?,
@@ -113,6 +116,10 @@ impl Config {
 
     pub fn server_url(&self) -> &str {
         &self.server_url
+    }
+
+    pub fn internal_url(&self) -> &str {
+        &self.internal_url
     }
 
     pub fn with_session(&self) -> bool {
