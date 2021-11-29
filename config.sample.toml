@@ -1,5 +1,6 @@
 [global]
 server_url = "https://auth-test.idcontact.test.tweede.golf"
+internal_url = "http://127.0.0.1:8000"
 with_session = true
 
 [global.attributes]
