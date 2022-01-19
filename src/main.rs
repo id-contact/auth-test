@@ -245,7 +245,8 @@ async fn start_authentication(
 ) -> Result<Json<StartAuthResponse>, Error> {
     config.verify_attributes(&request.attributes)?;
 
-    let attributes = base64::encode_config(serde_json::to_vec(&request.attributes)?, URL_SAFE_NO_PAD);
+    let attributes =
+        base64::encode_config(serde_json::to_vec(&request.attributes)?, URL_SAFE_NO_PAD);
     let continuation = base64::encode_config(&request.continuation, URL_SAFE_NO_PAD);
 
     if let Some(attr_url) = &request.attr_url {
