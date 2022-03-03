@@ -273,9 +273,6 @@ async fn start_authentication(
     }
 }
 
-#[get("/health")]
-fn health() {}
-
 #[launch]
 fn rocket() -> _ {
     let base = rocket::build().mount(
@@ -286,8 +283,7 @@ fn rocket() -> _ {
             user_oob,
             session_update,
             confirm_oob,
-            confirm_ib,
-            health,
+            confirm_ib
         ],
     );
 
