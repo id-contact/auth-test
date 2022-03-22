@@ -162,7 +162,7 @@ async fn user_oob(
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
     let auth_result = AuthResult {
-        status: AuthStatus::Succes,
+        status: AuthStatus::Success,
         attributes: Some(attributes),
         session_url: if config.with_session() {
             Some(format!("{}/session/update", config.internal_url()))
@@ -207,7 +207,7 @@ async fn user_inline(
     let attributes: Vec<String> = serde_json::from_slice(&attributes)?;
     let attributes = config.map_attributes(&attributes)?;
     let auth_result = AuthResult {
-        status: AuthStatus::Succes,
+        status: AuthStatus::Success,
         attributes: Some(attributes),
         session_url: if config.with_session() {
             Some(format!("{}/session/update", config.internal_url()))
